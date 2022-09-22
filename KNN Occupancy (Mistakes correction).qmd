@@ -1,0 +1,214 @@
+---
+title: "KNN occupancy V2"
+format: html
+editor: visual
+---
+
+## Team
+
+Writer : Jonah Cabayé
+
+Corrector : Bruno Santana
+
+## Business Understanding
+
+---
+Accurate occupancy detection of an office room from light, temperature, humidity and CO2 measurements using statistical learning models.
+---
+
+## Errors Documentation
+
+---
+Row 69 - Missing calling cntDiag to see result
+Row 73 - Missing %\>% on relevel function and calling "Occupancy" instead of "No occupancy"
+Row 99 - The dataframe CleanDF was not called in summary function
+Row 122 - Missing x value on numerator (min-max formula)
+Row 186 - Function 'confusionMatrix' not called
+---
+
+## Setup packages
+
+```{r}
+#install.packages(tidyverse)
+#install.packages(class)
+#install.packages(caret)
+library(tidyverse)
+library(class)
+library(caret)
+```
+
+## Read data
+
+```{r}
+url <- "https://raw.githubusercontent.com/HAN-M3DM-Data-Mining/data-mining-s1y2223-jonahcby/master/datasets/KNN-occupancy.csv"
+rawDF <- read_csv(url)
+```
+
+## Data Understanding
+
+```{r}
+str(rawDF)
+```
+
+## Data preparation
+
+```{r}
+# Randomizing order of the dataset
+cleanDF <- rawDF[sample(1:nrow(rawDF)),]
+```
+
+```{r}
+#Excluding the column first column because it is not a valuable variable for the model
+cleanDF <- cleanDF[-1]
+head(cleanDF)
+```
+
+## Data understanding: proportion between categories
+
+```{r}
+cntDiag <- table(cleanDF$Occupancy)
+propCat <- round(prop.table(cntDiag) * 100 , digits = 1)
+
+cntDiag
+propCat
+```
+
+\## It means there is 6414 unit = 0 and 1729=1 So there is 78.8% of 0 and 21.2 of 1
+
+## Renaming categories
+
+### Error 1 - Missing %\>% on relevel function and calling "Occupancy" instead of "No occupancy"
+
+```{r}
+#cleanDF$Occupancy <- factor(cleanDF$Occupancy, levels = c("0","1"), labels = c("No occupancy","Occupancy"))  relevel("Occupancy")
+#head(cleanDF, 10)
+```
+
+### Correction
+
+```{r}
+cleanDF$Occupancy <- factor(cleanDF$Occupancy, levels = c("0","1"), labels = c("No occupancy","Occupancy")) %>%  relevel("No occupancy")
+head(cleanDF, 10)
+```
+
+## Data understanding: proportion between categories (after renaming)
+
+```{r}
+cntDiag2 <- table(cleanDF$Occupancy)
+propCat2 <- round(prop.table(cntDiag2) * 100 , digits = 1)
+
+cntDiag2
+propCat2
+```
+
+## Analyzing variables
+
+### Error 2 - The dataframe CleanDF was not called
+
+```{r}
+#summary(c("Temperature","Humidity","Light","CO2","HumidityRatio","Occupancy"))
+```
+
+### Correction
+
+```{r}
+summary(cleanDF[c("Temperature","Humidity","Light","CO2","HumidityRatio","Occupancy")])
+```
+
+##Replacing missing values
+
+### This step is not necessary since there is no missing values in this dataset
+
+```{r}
+#cleanDF[is.na(cleanDF)] <- 0
+#summary(cleanDF[c("Temperature","Humidity","Light","CO2","HumidityRatio","Occupancy")])
+```
+
+## Normalizing variables
+
+### Error 3 - Missing x value on numerator (min-max formula)
+
+```{r}
+#normalize <- function(x) {
+#  return (( min(x)) / (max(x) - min(x)))}
+```
+
+### Correction
+
+```{r}
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))}
+```
+
+```{r}
+#reoerdering columns to make Occupancy the first column
+cleanDF <- cleanDF[, c(6, 1, 2, 3, 4,5)]
+
+head(cleanDF)
+```
+
+```{r}
+nCols <- dim(cleanDF)[2]
+cleanDF_n <- sapply(2:nCols,
+                    function(x) {
+  normalize(cleanDF[,x])
+}) %>% as.data.frame()
+```
+
+```{r}
+summary(cleanDF_n[,1:5])
+```
+
+### Commenting this session because it is not needed for the model
+
+```{r}
+#normalize <- function(x) { # Function takes in a vector
+#  return ((x - min(x)) / (max(x) - min(x))) # distance of item value - minimum vector value divided by the range of all vector values
+#}
+
+#testSet1 <- c(1:5)
+#testSet2 <- c(1:5) * 10
+
+#cat("testSet1:", testSet1, "\n")
+#cat("testSet2:", testSet2, "\n")
+#cat("Normalized testSet1:", normalize(testSet1), "\n")
+#cat("Normalized testSet2:", normalize(testSet2))
+```
+
+```{r}
+trainDF_feat <- cleanDF_n[1:4071,  ]
+testDF_feat <- cleanDF_n[4072:8143,  ]
+
+trainDF_labels <- cleanDF[1:4071,  1]
+testDF_labels <- cleanDF[4072:8143,  1]
+```
+
+## Modeling
+
+```{r}
+cleanDF_test_pred <- knn(train = as.matrix(trainDF_feat), test = as.matrix(testDF_feat), cl = as.matrix(trainDF_labels), k = 21)
+head(cleanDF_test_pred)
+```
+
+### Error 4 - Function 'confusionMatrix' not called
+
+```{r}
+#(cleanDF_test_pred, testDF_labels[[1]], positive = NULL, dnn = c("Prediction", "True"))
+```
+
+```{r}
+confusionMatrix(cleanDF_test_pred, testDF_labels[[1]], positive = NULL, dnn = c("Prediction", "True"))
+```
+
+## Visualizing tests
+
+```{r}
+#install.packages(psych)
+library(psych)
+pairs.panels(cleanDF_n, 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+```
